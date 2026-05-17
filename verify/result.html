@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>평가 결과 — 검증 도구</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<div id="header"></div>
+
+<div class="note">
+    <strong>📊 본인의 평가 결과 요약</strong><br>
+    AI 가 한 판정과 본인 평가의 일치도를 보여드립니다.
+    이 결과는 DB 에 저장되며 노트북에서 모든 평가자의 통합 분석에 사용됩니다.
+</div>
+
+<div id="content" class="loading">결과를 계산하는 중...</div>
+
+<div style="text-align:center; margin-top:30px;">
+    <a href="index.html" class="btn">← 세트 선택으로</a>
+    <a href="filter.html"  class="btn primary">필터 더 평가</a>
+    <a href="keyword.html" class="btn primary">키워드 더 평가</a>
+    <a href="embed.html"   class="btn primary">임베딩 더 평가</a>
+</div>
+
+<footer style="margin-bottom: 40px;">
+    차의과학대학교 AI헬스케어융합학과 · 박대근 교수
+</footer>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+const sess = requireSession();
+
+(async () => {
+    try {
+        const stats = await apiGet('stats', {
+            id:   sess.pack.eval_set_id,
+            user: sess.user.user_id,
+            pack: sess.pack.pack_no,
+        });
+
+        document.getElementById('header').innerHTML = renderHeader(
+            "📊 평가 결과",
+            `세트 ${sess.pack.pack_no} · 평가자: ${esc(sess.user.display_name)}`
+        );
+
+        const types = ['filter', 'keyword', 'embedding'];
+        const typeNames = {
+            filter:    '📋 필터링 리뷰',
+            keyword:   '📝 키워드 리뷰',
+            embedding: '🧠 임베딩 리뷰',
+        };
+
+        let html = '';
+        for (const type of types) {
+            const s = stats[type];
+            if (!s) continue;
+            const hva = s.human_vs_ai    || {};
+            const hvj = s.human_vs_judge || {};
+            html += `
+            <div class="result-card">
+                <h2>${typeNames[type]}</h2>
+                <div class="metric">
+                    <div class="name">평가한 건수</div>
+                    <div class="val">${s.total}</div>
+                </div>
+
+                <div style="margin-top: 14px; font-size: 13px; color: #6b7280; font-weight: 600;">
+                    🤖 vs 메인 AI
+                </div>
+                <div class="metric">
+                    <div class="name">정확 일치</div>
+                    <div class="val">${hva.agree_exact}
+                        <span style="font-size:14px;color:#6b7280;">(${hva.rate_exact}%)</span>
+                    </div>
+                </div>
+                ${type === 'embedding' ? `
+                <div class="metric">
+                    <div class="name">인접 일치 (±1 구간)</div>
+                    <div class="val" style="color:#f59e0b;">${hva.agree_adj}
+                        <span style="font-size:14px;color:#6b7280;">(${hva.rate_adj}%)</span>
+                    </div>
+                </div>` : ''}
+
+                ${hvj.agree_exact !== undefined ? `
+                <div style="margin-top: 14px; font-size: 13px; color: #6b7280; font-weight: 600;">
+                    ⚖️ vs LLM Judge
+                </div>
+                <div class="metric">
+                    <div class="name">정확 일치</div>
+                    <div class="val">${hvj.agree_exact}
+                        <span style="font-size:14px;color:#6b7280;">(${hvj.rate_exact}%)</span>
+                    </div>
+                </div>
+                ${type === 'embedding' ? `
+                <div class="metric">
+                    <div class="name">인접 일치 (±1 구간)</div>
+                    <div class="val" style="color:#f59e0b;">${hvj.agree_adj}
+                        <span style="font-size:14px;color:#6b7280;">(${hvj.rate_adj}%)</span>
+                    </div>
+                </div>` : ''}
+                ` : ''}
+
+                <div style="font-size:13px; color:#6b7280; margin-top:14px; padding-top:14px; border-top:1px solid #f3f4f6;">
+                    💡 메인 AI 와 Judge 의 의견이 다를 때 본인 판단을 비교 참고하세요.
+                </div>
+            </div>`;
+        }
+
+        if (!html) {
+            html = '<div class="empty">아직 이 세트에서 평가하지 않으셨습니다.</div>';
+        }
+        document.getElementById('content').innerHTML = html;
+
+    } catch (err) {
+        document.getElementById('content').innerHTML =
+            `<div class="empty" style="color:#dc2626;">결과 로드 실패: ${esc(err.message)}</div>`;
+    }
+})();
+</script>
+</body>
+</html>
