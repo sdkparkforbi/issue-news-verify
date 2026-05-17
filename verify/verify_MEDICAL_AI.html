@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>의료 AI 검증 도구</title>
+<style>
+* { box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+                 "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    margin: 0; background: #f4f6fa; color: #1a1f2e;
+}
+.wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+header {
+    background: linear-gradient(135deg, #2563eb, #0ea5e9);
+    color: white; padding: 32px; border-radius: 14px;
+    margin-bottom: 24px; box-shadow: 0 4px 20px rgba(37,99,235,0.2);
+}
+header h1 { margin: 0 0 8px 0; font-size: 26px; }
+header .sub { font-size: 14px; opacity: 0.95; }
+.note {
+    background: #fef3c7; border-left: 5px solid #f59e0b;
+    padding: 16px 20px; border-radius: 8px; margin-bottom: 20px;
+    font-size: 14px; line-height: 1.6;
+}
+.note strong { color: #92400e; }
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+}
+.stat {
+    background: white; padding: 16px; border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.stat .v { font-size: 26px; font-weight: 700; color: #2563eb; }
+.stat .l { font-size: 12px; color: #6b7280; margin-top: 4px; }
+.controls {
+    background: white; padding: 16px; border-radius: 10px;
+    margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap;
+    align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.controls input[type="text"] {
+    flex: 1; min-width: 200px; padding: 8px 12px;
+    border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;
+}
+.controls select {
+    padding: 8px 12px; border: 1px solid #d1d5db;
+    border-radius: 6px; font-size: 14px; background: white;
+}
+.btn {
+    padding: 8px 16px; border: none; border-radius: 6px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.btn-primary { background: #2563eb; color: white; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-success { background: #10b981; color: white; }
+.btn-success:hover { background: #059669; }
+.progress-bar {
+    background: white; padding: 12px 16px; border-radius: 10px;
+    margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.progress-bar .bar {
+    height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;
+}
+.progress-bar .fill {
+    height: 100%; background: linear-gradient(90deg, #10b981, #059669);
+    width: 0%; transition: width 0.3s;
+}
+.progress-bar .text {
+    display: flex; justify-content: space-between; font-size: 13px;
+    color: #6b7280; margin-bottom: 8px;
+}
+.card {
+    background: white; padding: 18px; border-radius: 10px;
+    margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border-left: 4px solid #e5e7eb;
+}
+.card.related   { border-left-color: #10b981; }
+.card.unrelated { border-left-color: #9ca3af; }
+.card.verified-agree    { background: #ecfdf5; }
+.card.verified-disagree { background: #fef2f2; }
+.card .meta {
+    display: flex; gap: 12px; font-size: 12px; color: #6b7280;
+    margin-bottom: 8px; flex-wrap: wrap;
+}
+.card .badge {
+    padding: 2px 8px; border-radius: 10px; font-weight: 600;
+}
+.badge.related   { background: #d1fae5; color: #065f46; }
+.badge.unrelated { background: #f3f4f6; color: #4b5563; }
+.card h3 {
+    margin: 0 0 8px 0; font-size: 16px; color: #1f2937;
+}
+.card h3 a { color: inherit; text-decoration: none; }
+.card h3 a:hover { color: #2563eb; text-decoration: underline; }
+.card .preview {
+    font-size: 13px; color: #4b5563; margin-bottom: 10px;
+    line-height: 1.6;
+}
+.card .reason {
+    background: #f9fafb; padding: 8px 12px; border-radius: 6px;
+    font-size: 13px; color: #4b5563; margin-bottom: 10px;
+    border-left: 3px solid #d1d5db;
+}
+.card .reason b { color: #1f2937; }
+.card .keywords {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.card .keywords .k {
+    background: #dbeafe; color: #1e40af; padding: 2px 8px;
+    border-radius: 10px; font-size: 12px;
+}
+.card .actions {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid #f3f4f6;
+}
+.card .actions .label {
+    font-size: 13px; color: #6b7280; margin-right: 4px;
+    align-self: center;
+}
+.card .actions button {
+    padding: 6px 12px; border: 1px solid #d1d5db;
+    background: white; border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: 500;
+}
+.card .actions button:hover { background: #f9fafb; }
+.card .actions button.active.agree {
+    background: #10b981; color: white; border-color: #10b981;
+}
+.card .actions button.active.disagree {
+    background: #ef4444; color: white; border-color: #ef4444;
+}
+.card .actions button.active.skip {
+    background: #6b7280; color: white; border-color: #6b7280;
+}
+.card .note-input {
+    margin-top: 8px; width: 100%; padding: 6px 10px;
+    border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px;
+    display: none;
+}
+.card.verified-disagree .note-input { display: block; }
+footer {
+    text-align: center; padding: 24px; color: #9ca3af; font-size: 13px;
+}
+#empty {
+    background: white; padding: 40px; border-radius: 10px;
+    text-align: center; color: #9ca3af;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+    <h1>📋 인간 연구자 검증 도구</h1>
+    <div class="sub">분석 주제: <b>의료 AI</b>  ·  기간: 2026-05-15 ~ 2026-05-17  ·  생성: 2026-05-17 08:45</div>
+</header>
+
+<div class="note">
+    <strong>⚠️ AI 가 한 모든 판단은 1차 자료입니다.</strong><br>
+    아래 기사를 직접 확인하면서 AI 의 관련성 판정과 키워드 추출이 적절한지 평가해 주세요.
+    각 카드의 <b>동의 / 이의 / 건너뜀</b> 버튼을 누르면 이 페이지가 자동으로 결과를 기록합니다.
+    마지막에 <b>검증 결과 CSV 내려받기</b> 버튼으로 본인의 라벨링을 파일로 받아 분석에 활용할 수 있습니다.
+    (저장은 브라우저 메모리에만 이루어지며, 페이지를 새로고침하면 초기화됩니다.)
+</div>
+
+<div class="stats">
+    <div class="stat"><div class="v">26</div><div class="l">전체 헤드라인</div></div>
+    <div class="stat"><div class="v">26</div><div class="l">관련 판정 (AI)</div></div>
+    <div class="stat"><div class="v">0</div><div class="l">무관 판정 (AI)</div></div>
+    <div class="stat"><div class="v">26</div><div class="l">본문 수집 완료</div></div>
+    <div class="stat"><div class="v">4</div><div class="l">키워드 추출 완료</div></div>
+</div>
+
+<div class="progress-bar">
+    <div class="text">
+        <span><b>검증 진행률</b></span>
+        <span id="prog-text">0 / 26 검증 완료</span>
+    </div>
+    <div class="bar"><div class="fill" id="prog-fill"></div></div>
+</div>
+
+<div class="controls">
+    <input type="text" id="search" placeholder="제목·언론사·키워드 검색...">
+    <select id="filter-judge">
+        <option value="all">AI 판정 - 전체</option>
+        <option value="1">관련만</option>
+        <option value="0">무관만</option>
+    </select>
+    <select id="filter-verify">
+        <option value="all">검증 상태 - 전체</option>
+        <option value="none">미검증만</option>
+        <option value="agree">동의만</option>
+        <option value="disagree">이의만</option>
+        <option value="skip">건너뜀만</option>
+    </select>
+    <button class="btn btn-success" onclick="downloadCSV()">📥 검증 결과 CSV 내려받기</button>
+</div>
+
+<div id="cards"></div>
+<div id="empty" style="display:none;">표시할 기사가 없습니다.</div>
+
+<footer>
+    Generated by Issue News Pipeline (AI-assisted research tool).<br>
+    Human verification is required for all AI outputs.
+</footer>
+
+</div>
+
+<script>
+const CARDS = [{"url": "https://n.news.naver.com/mnews/article/087/0001193594?sid=102", "date": "20260517", "press": "강원일보", "title": "한림성심대 ‘AID 전환 중점 전문대학 지원사업’ 선정", "preview": "이번 사업은 재단 병원 인프라를 활용해AI의료실무 교육 체계를 정립하는 등AI기반 교육 인프라 구축을 목표로 했다. 또 전 계열 전공별AI·DX 융합 교육을 기반으로 실무 인재 양성도 추진한다. 핵심 전략은 △H-AIDE BASE 구축 △수요자 맞춤형 X-AI융합 실무 교육체제 구축 △AI기반 교수학습 혁신...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 675}, {"url": "https://n.news.naver.com/mnews/article/011/0004621521?sid=103", "date": "20260517", "press": "서울경제", "title": "“1000건 넘게 수술한 의사보다 낫다” 간 섬유화 예측하는AI등장[헬시...", "preview": "간암 환자의 수술 전략을 결정하는 핵심 정보인 간 섬유화 정도를 수술 중 실시간으로 정확하게 예측하는 인공지능(AI) 기술이 국내의료진에 의해 개발됐다. 간암 수술을 1000건 이상 집도한 외과 의사보다 정확하다는 평가도 나왔다. 삼성서울병원은 최규성·오남기 이식외과 교수와 유학제AI연구센터...", "is_related": 1, "reason": "의료 AI와 관련된 내용을 다루고 있기 때문입니다.", "keywords": {"간 섬유": 6, "간암": 3, "모델": 3, "수술": 3, "임상": 3, "환자": 3, "정확": 2, "진단": 2, "딥러닝": 2, "인공지능": 1}, "body_len": 1467}, {"url": "https://n.news.naver.com/mnews/article/030/0003428362?sid=102", "date": "20260517", "press": "전자신문", "title": "공공병원AI클라우드 전환사업 논란…“범위·기간 모두 과중”", "preview": "국립중앙의료원과 서울의료원을 우선 대상으로AI클라우드 기반 HIS를 구축·적용한다. 두의료원 적용 결과를 토대로 향후 전국 35개 지방 공공의료원으로 확산할 계획이다. 문제는 사업 성격이 '실증'과 '구축'을 동시에 포괄하고 있다는 점이다. 사업자는 전자의무기록(EMR), 처방전달시스템(OCS)...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있기 때문입니다.", "keywords": {}, "body_len": 1508}, {"url": "https://n.news.naver.com/mnews/article/030/0003428321?sid=102", "date": "20260517", "press": "전자신문", "title": "정은경 장관, 정부대표단 수석대표로 세계보건총회 참석", "preview": "아울러 정 장관은 총회 기간 중 인도네시아, 필리핀, 우크라이나 등 주요 회원국 보건부 장관과 양자 면담을 갖고 △보건의료협력 양해각서(MOU) 체결·갱신 △AI기본의료협력 △의료인 연수 협력 등 국가 간 협력 의제를 폭넓게 논의할 예정이다. 정은경 장관은 “올해 WHO 총회는 故 이종욱 사무총장 서거...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 1042}, {"url": "https://n.news.naver.com/mnews/article/030/0003428284?sid=100", "date": "20260517", "press": "전자신문", "title": "[6·3 지선 릴터뷰]민형배 “전남·광주 통합 골든타임…AI·에너지 대전...", "preview": "전체의 80%인 16조원은AI·반도체·우주·RE100 산업단지 등 첨단산업 투자에 사용하고, 10%는 청년 주거와 인재 양성, 나머지 10%는 돌봄·의료등 사회안전망 구축에 투입할 계획이다. 민 후보는 “통합특별시가 전략적으로 투자해 기업 지분을 확보하는 방식으로 300조원 이상의 민간 투자를 끌어낼 수 있다”고...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 2312}, {"url": "https://n.news.naver.com/mnews/article/030/0003428213?sid=105", "date": "20260517", "press": "전자신문", "title": "랜섬웨어 공포에 병원이 움직였다…의료보안관제 가입 급증", "preview": "정부가의료 AI도입 활성화에 나서고 환자 데이터 교류와 공동연구가 활발해진 점도 영향을 미쳤다. 의료 데이터 활용이 확대되는 만큼 유출 가능성에 대한 우려도 커졌기 때문이다. 한국보건사회연구원이 국내 의료기관 사이버 보안 침해 사례를 분석한 결과 공격은 주로 의료기관 핵심 운영 자산에...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 1359}, {"url": "https://n.news.naver.com/mnews/article/032/0003446058?sid=103", "date": "20260516", "press": "경향신문", "title": "“ ‘지·필·공(지역·필수·공공의료)’ 대표…AI더해 플랫폼 병원 모...", "preview": "지역사회의 필수의료를 최전선에서 담당해야 한다는 책무는 무겁지만 공적의료를 제공하면서 불가피하게 감당해야 할 부담이 경영지표상의 적자로 나타나는 데엔 비판이 뒤따른다. 또한 공공의료의 질적 수준을 높여야 한다는 목소리는 큰 반면 그에 걸맞은 지원에는 인색해지는 현실 역시 만만치 않다. 지역...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 3496}, {"url": "https://n.news.naver.com/mnews/article/022/0004128494?sid=103", "date": "20260516", "press": "세계일보", "title": "인류 문명 재건할 ‘양자 전능 시대’ 온다", "preview": "0 시대가 산업과 경제,의료, 금융, 기후 대응 분야를 어떻게 바꿔놓을지 구체적으로 전망한다. 저자는 20세기의 ‘퀀텀 1.0’이 양자세계의 기묘한 현상을 발견하고 이해하는 시대였다면, ‘퀀텀 2.0’은 그 기묘함 자체를 기술 자원으로 활용하는 시대라고 설명한다.AI생성 이미지 책에 따르면, 20세기의...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있기 때문입니다.", "keywords": {}, "body_len": 2706}, {"url": "https://n.news.naver.com/mnews/article/353/0000055449?sid=102", "date": "20260516", "press": "중앙SUNDAY", "title": "우리 곁의 펫지피티", "preview": "미국 식품의약국(FDA)도AI반려·돌봄 로봇이 치매 환자의 고립감 완화와 고령층의 우울증 해소 등에 도움을 준다고 인정하고 기준을 충족한AI로봇을 정식의료기기로 승인하고 있다. 이귀옥 세종대 교수는 “최근 연구에 따르면AI반려·돌봄 로봇의 효용성을 높이기 위해서는 간호사나 요양보호사...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 2565}, {"url": "https://n.news.naver.com/mnews/article/005/0001849105?sid=101", "date": "20260515", "press": "국민일보", "title": "국방 자주권 위한 ‘소버린AI’ 첫발… SKT, 에이닷엑스로 국방 AX 추진", "preview": "김명국 SK텔레콤 인더스트리얼AI본부장은 “SK텔레콤의AI기술력부터 데이터센터, 통신을 아우르는 통합 역량을 바탕으로 K-국방 경쟁력 강화에 기여하게 돼 의미가 크다”며 “향후 금융·제조·의료·공공 등 영역에서AI활용을 확산해 K-AI경쟁력을 강화해 나갈 것”이라고 밝혔다. 전준범 국방부...", "is_related": 1, "reason": "의료 AI와 관련된 내용을 다루고 있기 때문입니다.", "keywords": {"의료": 1}, "body_len": 1053}, {"url": "https://n.news.naver.com/mnews/article/656/0000176398?sid=110", "date": "20260515", "press": "대전일보", "title": "[의료칼럼] 지속 가능한 건강을 위한 '재활 철학'", "preview": "앞으로의의료는AI와 웨어러블 기술이 함께하는 방향으로 발전할 것이다. 손목 위의 시계가 혈압 변화를 감지하고 건강 이상 신호를 먼저 알려주는 시대다. 하지만 기술은 어디까지나 길을 비춰주는 도구일 뿐이다. 결국 그 길을 걷는 것은 자신의 몸을 돌보려는 인간의 의지다. 중요한 것은 데이터를 맹신하는...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 1146}, {"url": "https://n.news.naver.com/mnews/article/020/0003719813?sid=102", "date": "20260515", "press": "동아일보", "title": "글로벌AI-방산-반도체 인재 양성… 매머드급 국가거점국립대로 새 도약", "preview": "최근 교육부 ‘AI 분야 첨단산업 인재 양성 부트캠프’ 대학으로 선정돼 클라우드 기반 AI 서비스, 생성형 AI 및 대규모 언어모델 운영(LLMOps),의료 AI같은 특화한 트랙을 운영하고 있다. 반도체-방위산업 메카 혁신은 반도체와 방위산업으로 이어진다. 반도체 분야에서는 ‘반도체특성화대학 지원 사업’...", "is_related": 1, "reason": "의료 AI와 관련된 내용이 포함되어 있을 가능성이 있음", "keywords": {}, "body_len": 2252}, {"url": "https://n.news.naver.com/mnews/article/011/0004621070?sid=103", "date": "20260515", "press": "서울경제", "title": "밤중 산소포화도 떨어진 환자 3분만에 대처…어떻게 가능했을까", "preview": "세브란스병원은 향후 이 시스템을 인공지능(AI) 기반 예측 기술과 연계해 더욱 고도화할 계획이다. 현재 상태를 확인하는 수준을 넘어, 축적된 데이터를 기반으로 환자의 상태 악화를 사전에 예측하고의료진에게 알리는 방향으로 발전시키는 데 목표를 둔다. 이강영 세브란스병원장은 “24시간 전 병동의 모든...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 2006}, {"url": "https://n.news.naver.com/mnews/article/081/0003643907?sid=110", "date": "20260515", "press": "서울신문", "title": "[기고] 과학 혁신의 답 ‘질문’에서 찾는다", "preview": "이는 향후 인공지능(AI), 정밀의료, 신약 개발 등 국가 전략 분야의 경쟁력을 결정짓는 핵심 자산이 될 것이다. 제도 변화의 진정한 가치는 연구 생태계의 구조적 변화에 있다. 이제 연구자는 자율성을 보장받는 동시에 그에 걸맞은 책임성을 요구받게 된다. 학회 또한 단순한 학술 모임을 넘어 정부의 정책...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 1696}, {"url": "https://n.news.naver.com/mnews/article/081/0003643934?sid=102", "date": "20260515", "press": "서울신문", "title": "[서울신문·삼성 공동 캠페인] 집에서 청진기 대면 의사가 처방… 지역...", "preview": "의료사각 없애는 ‘비대면 진료 플랫폼’ 소아과 부족한 지역의 ‘오픈런’ 해결 가정 측정 데이터 기반해 영상 진료 복지 사각 줄이는 ‘초단기 돌봄... 인공지능(AI) 기술도 적용됐다. 측정 데이터 품질을AI가 1차 점검해 불명확할 경우 재측정을 안내하는 방식이다. 인제대 기술지주 자회사인...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 2963}, {"url": "https://n.news.naver.com/mnews/article/081/0003643956?sid=102", "date": "20260515", "press": "서울신문", "title": "관악S밸리처럼… 청소년 창업 정신 ‘쑥쑥’", "preview": "올해는 5월부터 7월까지 미림마이스터고, 영락고, 영락의료과학고, 서울관광고 등 4개 고교에서 학년별 특강과 창업 동아리 맞춤형 교육 등을 총 8회에... 또한 서주호 솔리브벤처스 대표, 김기환 위페어 대표 등 인공지능(AI) 기반 교육정보기술(에듀테크) 분야나 생명공학 산업에서 두각을 나타낸 스타트업...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있기 때문입니다.", "keywords": {}, "body_len": 805}, {"url": "https://n.news.naver.com/mnews/article/081/0003643992?sid=110", "date": "20260515", "press": "서울신문", "title": "[지방시대] 광주·전남 통합, 백년대계 돼야", "preview": "청년과 자본, 기업과 대학,의료와 문화가 서울·수도권으로 쏠리는 동안 지역은 소멸의 경고음을 울려 왔다. 이러한 현실에서 광주·전남 통합은 단순한... 광주가 보유한 인공지능(AI) 산업 기반과 전남의 에너지·신재생 자원은 상호 보완성이 크다. 여기에 반도체와 데이터 산업까지 결합되면 광주·전남은 단순...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 1690}, {"url": "https://n.news.naver.com/mnews/article/014/0005521840?sid=103", "date": "20260515", "press": "파이낸셜뉴스", "title": "\"호르몬은 우리 몸을 읽는 언어…하루 15분만 햇볕 쬐어도 균형생겨\" [W...", "preview": "HLB라이프케어가 최근 출시한 개인용 체내 연속혈당측정기(CGM) '피코링'은 식품의약품안전처로부터 3등급의료기기 허가를 받았다. 안 교수는 피코링 같은 웨어러블 기기가 혈당을 넘어 다양한 호르몬을 측정하고, 이를AI가 분석해 개인 맞춤형 건강 관리 솔루션을 제공하는 방식으로 발전할 것이라고 했다....", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {"호르몬": 5, "AI": 3, "개인": 3, "관리": 3, "분석": 3, "예방": 3, "건강": 2, "예측": 2, "의료": 2, "측정": 2}, "body_len": 1957}, {"url": "https://n.news.naver.com/mnews/article/028/0002805169?sid=102", "date": "20260515", "press": "한겨레", "title": "김종진 “삼성전자 노사 ‘연대기금’ 출연해 반도체 생태계·노동격차...", "preview": "에이아이(AI) 반도체 상생기금을 만들어 연구개발(R&D)부터 협력업체 지원 등 지속 가능한 반도체 생태계를 만들 수 있다”고 강조했다. 그는 민주노총의 산업별노조인 보건의료노조의 사례를 들었다. 김 소장은 “초기업노조인 보건의료노조는 임금 인상만 요구하지 않는다.의료의 공공성 등 산업의 문제를...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 1389}, {"url": "https://n.news.naver.com/mnews/article/015/0005287624?sid=101", "date": "20260515", "press": "한국경제", "title": "\"이제는AI효율전쟁…한국 기업들에 기회 충분하다\"", "preview": "AI기반의료서비스 기업인 임프리메드의 임성원 대표는 “세포 데이터로 약물 반응과 생존율을 예측해 암 치료 성과를 높였다”고 소개했다. 리걸테크 기업 엘박스의 이진 대표는 “에이전트AI로 추론 능력이 극대화하면서 데이터가 더욱 중요해졌다”고 했다.", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있기 때문입니다.", "keywords": {}, "body_len": 2315}, {"url": "https://n.news.naver.com/mnews/article/015/0005287530?sid=103", "date": "20260515", "press": "한국경제", "title": "[책마을] 양자의 기묘함을 제어하는 시대가 왔다", "preview": "3000억년에 겨우 1초의 오차를 보이는 양자 시계는 금융 시장의 거래 속도를 재정의하고 있으며,의료현장에서는 뇌의 미세한 자기 신호를 읽어 신경... 미국과 중국, 유럽의 빅테크 기업들이 ‘양자 우위’를 두고 경쟁하는 현실, 기존 암호체계가 무력화될 가능성,AI와 양자컴퓨팅의 결합이 가져올 윤리적...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 1615}, {"url": "https://n.news.naver.com/mnews/article/015/0005287229?sid=110", "date": "20260515", "press": "한국경제", "title": "[사설] '복지국가' 스웨덴의 변신…민영화·감세로 경제활력 되찾아", "preview": "의료·교육·복지급여 등 스웨덴의 공공 지출 비중은 미국과 비슷한 수준인 GDP의 24%로 떨어졌다. 30%를 넘는 프랑스 이탈리아 등보다 훨씬 낮다. 3년 연속... 민영화된 병원들은 인공지능(AI) 기술을 빠르게 접목해 더 적은 비용으로 더 많은 성과를 내고 있다. 물론 스웨덴과 같은 과감한 개혁이 모두를...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {"기술": 1, "병원": 1, "비용": 1, "성과": 1, "인공지능": 1}, "body_len": 1027}, {"url": "https://n.news.naver.com/mnews/article/469/0000930859?sid=100", "date": "20260515", "press": "한국일보", "title": "추경호 \"민주당 오만이 하늘 찔러... '보수 심장' 대구서 헌법 가치·경...", "preview": "인공지능(AI)·로봇·모빌리티·반도체·바이오 등을 중심으로 산업 구조를 전환하겠다. 또의료·문화·관광 분야 경쟁력이 강한 도시인 만큼 서비스 산업을 육성하고 창업을 활성화시키겠다. 동시에 추경 편성을 통해 택시와 전통시장, 골목상권 등 민생 숨통을 틔우겠다.\" -경제 활성화를 위해선 기업 유치가...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 3421}, {"url": "https://n.news.naver.com/mnews/article/016/0002643979?sid=100", "date": "20260515", "press": "헤럴드경제", "title": "“정주여건 해결…부울경도 ‘수도권’될 것” [6·3 지방선거 인터뷰]", "preview": "[김경수 후보 캠프 제공] 김경수 더불어민주당 경남지사 후보는 “교통,의료등 정주여건을 해결하면 부울경(부산·울산·경남)도 또 하나의 수도권이 될...AI대전환과 연구개발 투자가 필요하다. 정부의 집중적 투자도 있어야 하고, 규제도 걸림돌이다. 메가특구를 통해 주력 업종들이 발전 속도를 내는 데...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 1913}, {"url": "https://n.news.naver.com/mnews/article/016/0002643924?sid=101", "date": "20260515", "press": "헤럴드경제", "title": "“팔천피는 중간역, ‘만스피’도 가능…반도체 더 간다”", "preview": "조수홍 센터장은 “주식시장의 추세 변환 요인은AI캐즘”이라며 “이 트리거로 고려해 볼 수 있는 요인은 경제성 부족에 따른 투자 규모 축소, 금융,의료등 자율 에이전트 관련 사고 등에 의한 신뢰성 및 안정성 훼손, 그에 따른 법적 규제 확대, 인프라 병목으로 인한 발전 지연”이라고 강조했다....", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 2744}, {"url": "https://n.news.naver.com/mnews/article/016/0002643913?sid=102", "date": "20260515", "press": "헤럴드경제", "title": "인사", "preview": "이동연 ▷의료혁신실장 이순태 ▷대외협력실장 이승미 ▷정보화실장 이호영 ▷국제사업실장 권우일 ▷의학역사문화원장 박상민 ▷진료자원실장 송재진 ▷중앙심뇌혈관질환센터장 정근화 ▷헬스케어AI연구원장 이형철 ▷연구기획관리실장 이승표 ▷강남센터 부원장 최수연 ▷강남센터 헬스케어연구소장...", "is_related": 1, "reason": "기사의 내용이 의료 AI와 관련된 주제를 다루고 있을 가능성이 있음", "keywords": {}, "body_len": 526}];
+const verdicts = {};   // url → 'agree' | 'disagree' | 'skip'
+const notes    = {};   // url → 이의 메모
+
+function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+function formatDate(d) {
+    if (!d || d.length !== 8) return d || '';
+    return d.substring(0,4) + '-' + d.substring(4,6) + '-' + d.substring(6,8);
+}
+
+function renderCard(c) {
+    const judge = c.is_related === 1
+        ? '<span class="badge related">AI: 관련</span>'
+        : '<span class="badge unrelated">AI: 무관</span>';
+    const verdict = verdicts[c.url];
+    const cls = c.is_related === 1 ? 'related' : 'unrelated';
+    const verifyCls = verdict === 'agree' ? ' verified-agree' :
+                      verdict === 'disagree' ? ' verified-disagree' : '';
+
+    let kwHtml = '';
+    if (c.keywords && Object.keys(c.keywords).length > 0) {
+        kwHtml = '<div class="keywords"><span style="font-size:12px;color:#6b7280;">키워드:</span>';
+        for (const [w, f] of Object.entries(c.keywords)) {
+            kwHtml += `<span class="k">${escapeHtml(w)} <small>(${f})</small></span>`;
+        }
+        kwHtml += '</div>';
+    }
+
+    const reason = c.reason ? `<div class="reason"><b>AI 판정 사유:</b> ${escapeHtml(c.reason)}</div>` : '';
+    const noteVal = notes[c.url] || '';
+
+    return `
+    <div class="card ${cls}${verifyCls}" data-url="${escapeHtml(c.url)}">
+        <div class="meta">
+            ${judge}
+            <span>📅 ${formatDate(c.date)}</span>
+            <span>📰 ${escapeHtml(c.press)}</span>
+            ${c.body_len > 0 ? `<span>📄 본문 ${c.body_len.toLocaleString()}자</span>` : ''}
+        </div>
+        <h3><a href="${escapeHtml(c.url)}" target="_blank">${escapeHtml(c.title)}</a></h3>
+        <div class="preview">${escapeHtml(c.preview)}</div>
+        ${reason}
+        ${kwHtml}
+        <div class="actions">
+            <span class="label">사람 검증:</span>
+            <button class="agree ${verdict==='agree'?'active':''}" onclick="setVerdict('${escapeHtml(c.url)}','agree')">✓ 동의</button>
+            <button class="disagree ${verdict==='disagree'?'active':''}" onclick="setVerdict('${escapeHtml(c.url)}','disagree')">✗ 이의</button>
+            <button class="skip ${verdict==='skip'?'active':''}" onclick="setVerdict('${escapeHtml(c.url)}','skip')">⊘ 건너뜀</button>
+        </div>
+        <input type="text" class="note-input" placeholder="이의 메모 (선택)" value="${escapeHtml(noteVal)}" oninput="setNote('${escapeHtml(c.url)}', this.value)">
+    </div>`;
+}
+
+function setVerdict(url, v) {
+    if (verdicts[url] === v) {
+        delete verdicts[url];   // 같은 버튼 다시 누르면 해제
+    } else {
+        verdicts[url] = v;
+    }
+    saveProgress();
+    render();
+}
+
+function setNote(url, val) {
+    notes[url] = val;
+    saveProgress();
+}
+
+function saveProgress() {
+    try {
+        const data = JSON.stringify({verdicts, notes});
+        // localStorage 가 가능하면 저장, 안 되면 무시
+        if (typeof(Storage) !== 'undefined') {
+            localStorage.setItem('verify_progress_' + window.location.pathname, data);
+        }
+    } catch(e) {}
+}
+
+function loadProgress() {
+    try {
+        if (typeof(Storage) !== 'undefined') {
+            const raw = localStorage.getItem('verify_progress_' + window.location.pathname);
+            if (raw) {
+                const d = JSON.parse(raw);
+                Object.assign(verdicts, d.verdicts || {});
+                Object.assign(notes, d.notes || {});
+            }
+        }
+    } catch(e) {}
+}
+
+function render() {
+    const searchTerm = document.getElementById('search').value.toLowerCase();
+    const fJudge  = document.getElementById('filter-judge').value;
+    const fVerify = document.getElementById('filter-verify').value;
+
+    const filtered = CARDS.filter(c => {
+        if (fJudge !== 'all' && c.is_related !== parseInt(fJudge)) return false;
+        const v = verdicts[c.url];
+        if (fVerify === 'none' && v) return false;
+        if (fVerify === 'agree'    && v !== 'agree') return false;
+        if (fVerify === 'disagree' && v !== 'disagree') return false;
+        if (fVerify === 'skip'     && v !== 'skip') return false;
+        if (searchTerm) {
+            const blob = (c.title + ' ' + c.preview + ' ' + c.press + ' ' +
+                          Object.keys(c.keywords || {}).join(' ')).toLowerCase();
+            if (!blob.includes(searchTerm)) return false;
+        }
+        return true;
+    });
+
+    const container = document.getElementById('cards');
+    const empty = document.getElementById('empty');
+    if (filtered.length === 0) {
+        container.innerHTML = '';
+        empty.style.display = 'block';
+    } else {
+        empty.style.display = 'none';
+        container.innerHTML = filtered.map(renderCard).join('');
+    }
+
+    // 진행률
+    const done = Object.keys(verdicts).length;
+    const total = CARDS.length;
+    const pct = total > 0 ? (done / total * 100) : 0;
+    document.getElementById('prog-fill').style.width = pct + '%';
+    document.getElementById('prog-text').textContent = `${done} / ${total} 검증 완료 (${pct.toFixed(1)}%)`;
+}
+
+function downloadCSV() {
+    let csv = 'url,publish_date,press,title,preview,is_related,ai_reason,keywords,verdict,note
+';
+    for (const c of CARDS) {
+        const v = verdicts[c.url] || '';
+        const n = (notes[c.url] || '').replace(/"/g, '""');
+        const kws = Object.entries(c.keywords || {}).map(([k,f]) => `${k}:${f}`).join(';');
+        const fields = [
+            c.url, formatDate(c.date), c.press, c.title,
+            (c.preview || '').replace(/
+/g, ' '),
+            c.is_related, c.reason, kws, v, n
+        ].map(s => `"${String(s).replace(/"/g, '""')}"`);
+        csv += fields.join(',') + '
+';
+    }
+    const blob = new Blob(["﻿" + csv], {type: 'text/csv;charset=utf-8'});
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'verification_MEDICAL_AI.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+// 이벤트 연결
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('filter-judge').addEventListener('change', render);
+document.getElementById('filter-verify').addEventListener('change', render);
+
+// 초기화
+loadProgress();
+render();
+</script>
+</body>
+</html>
