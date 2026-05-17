@@ -1,190 +1,20 @@
 <!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>인간 연구자 검증 도구</title>
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-<div class="wrap">
-
-<header class="app">
-    <h1>📋 인간 연구자 검증 도구</h1>
-    <div class="sub">
-        Issue News Pipeline · 분할 세트 기반 다중 평가자 검증
-    </div>
-</header>
-
-<div class="note">
-    <strong>⚠️ AI 결과는 1차 자료입니다.</strong><br>
-    이 도구는 AI 가 만든 결과 (관련성 / 키워드 / 임베딩 유사도) 가 적절한지 사람이 확인하기 위해 사용됩니다.<br>
-    평가는 <b>5개 세트로 나뉘어 있으며 각 세트는 20개씩</b>입니다. 본인 학번/아이디로 한두 세트를 골라 검증해 주시면 됩니다.
-    같은 세트를 여러 분이 평가하면 평가자 간 신뢰도(IRR) 까지 계산할 수 있습니다.
-</div>
-
-<div class="form-box">
-    <h2>1단계 — 본인 확인</h2>
-    <label>학번 / 아이디 *</label>
-    <input type="text" id="user_id" placeholder="예: 20241234" autocomplete="off">
-
-    <label>표시 이름 (선택)</label>
-    <input type="text" id="display_name" placeholder="예: 박대근">
-
-    <h2 style="margin-top:24px;">2단계 — 평가 세트 선택</h2>
-    <p style="font-size:13px; color:#6b7280; margin-bottom:14px;">
-        하고 싶은 만큼만 평가해 주세요. 마치지 못한 세트는 다음에 이어서 할 수 있습니다.
-    </p>
-    <div id="packs">
-        <div class="loading">세트 목록을 불러오는 중...</div>
-    </div>
-</div>
-
-<footer>
-    차의과학대학교 AI헬스케어융합학과 · 박대근 교수
-</footer>
-
-</div>
-
-<script src="app.js"></script>
-<script>
-const TYPE_NAMES = {
-    filter:    "📋 필터링",
-    keyword:   "📝 키워드",
-    embedding: "🧠 임베딩",
-};
-
-// 기존 로그인 정보 자동 채움
-const u = getUser();
-if (u) {
-    document.getElementById('user_id').value      = u.user_id || '';
-    document.getElementById('display_name').value = u.display_name || '';
-}
-
-// 세트팩 목록 로드
-(async () => {
-    const container = document.getElementById('packs');
-    try {
-        const packs = await apiGet('list_packs');
-        if (!packs || packs.length === 0) {
-            container.innerHTML = `
-                <div class="empty">
-                    등록된 평가 세트가 없습니다.<br>
-                    노트북에서 8단계 (평가 세트 준비) 를 먼저 실행하세요.
-                </div>`;
-            return;
-        }
-
-        // 사용자가 이미 한 진행률
-        const userId = document.getElementById('user_id').value.trim();
-        let progress = [];
-        if (userId) {
-            try {
-                progress = await apiGet('get_user_progress', {user: userId});
-            } catch (e) {}
-        }
-        const progMap = {};
-        progress.forEach(p => {
-            const key = `${p.eval_set_id}|${p.pack_no}|${p.review_type}`;
-            progMap[key] = parseInt(p.n_done);
-        });
-
-        // 그룹화: eval_set_id 별로 모으기
-        const bySet = {};
-        packs.forEach(p => {
-            if (!bySet[p.eval_set_id]) bySet[p.eval_set_id] = {meta: p, packs: []};
-            bySet[p.eval_set_id].packs.push(p);
-        });
-
-        let html = '';
-        Object.values(bySet).forEach(group => {
-            const m = group.meta;
-            html += `
-            <div style="margin-bottom: 22px;">
-                <div style="font-weight: 700; color: #1f2937; margin-bottom: 8px;">
-                    ${esc(m.topic_name)} <small style="color:#6b7280; font-weight:400;">
-                    (${esc(m.period_start)} ~ ${esc(m.period_end)})</small>
-                </div>
-                <div style="font-size: 12px; color: #6b7280; margin-bottom: 12px;">
-                    Chat: ${esc(m.chat_model)} · Embed: ${esc(m.embed_model)}
-                    ${m.judge_model ? '· Judge: ' + esc(m.judge_model) : ''}
-                </div>
-            `;
-
-            // 평가 종류별로 분류
-            const byType = {filter: [], keyword: [], embedding: []};
-            group.packs.forEach(p => byType[p.review_type].push(p));
-
-            ['filter', 'keyword', 'embedding'].forEach(type => {
-                if (byType[type].length === 0) return;
-                html += `
-                <div style="font-size: 13px; color: #4b5563; margin: 12px 0 6px 0;">
-                    <b>${TYPE_NAMES[type]}</b> (${byType[type].length}개 세트)
-                </div>`;
-                byType[type].sort((a,b) => a.pack_no - b.pack_no).forEach(p => {
-                    const key = `${p.eval_set_id}|${p.pack_no}|${type}`;
-                    const myDone = progMap[key] || 0;
-                    const myPct  = p.n_samples > 0 ? Math.round(myDone / p.n_samples * 100) : 0;
-                    const reviewers = parseInt(p.n_reviewers) || 0;
-                    const cls = myDone === p.n_samples && p.n_samples > 0 ? 'done' : '';
-                    const badge = myDone === p.n_samples && p.n_samples > 0
-                        ? '<span class="badge-small done">✓ 완료</span>'
-                        : (myDone > 0
-                           ? `<span class="badge-small">진행 ${myPct}%</span>`
-                           : `<span class="badge-small">미평가</span>`);
-                    html += `
-                    <div class="pack-card ${cls}"
-                         onclick="goPack('${esc(p.eval_set_id)}', ${p.pack_no}, '${type}')">
-                        <div class="head">
-                            <div class="title">
-                                세트 ${p.pack_no} ${p.label ? '· ' + esc(p.label) : ''}
-                                <small style="color:#9ca3af; font-weight:400;">(${p.n_samples}개)</small>
-                            </div>
-                            ${badge}
-                        </div>
-                        <div class="sub">
-                            ${myDone > 0 ? `내 진행: ${myDone}/${p.n_samples} · ` : ''}
-                            전체 평가자: ${reviewers}명
-                        </div>
-                    </div>`;
-                });
-            });
-
-            html += `</div>`;
-        });
-
-        container.innerHTML = html;
-
-    } catch (e) {
-        container.innerHTML = `
-            <div class="empty" style="color:#dc2626;">
-                세트 목록 로드 실패<br>
-                <small>${esc(e.message)}</small>
-            </div>`;
-    }
-})();
-
-function goPack(eval_set_id, pack_no, review_type) {
-    const user_id = document.getElementById('user_id').value.trim();
-    if (!user_id) {
-        alert("학번/아이디를 입력하세요.");
-        document.getElementById('user_id').focus();
-        return;
-    }
-    const display = document.getElementById('display_name').value.trim() || user_id;
-    setUser(user_id, display);
-    setCurrentPack(eval_set_id, pack_no, review_type);
-
-    const pageMap = {
-        filter: 'filter.html', keyword: 'keyword.html', embedding: 'embed.html'
-    };
-    location.href = pageMap[review_type];
-}
-
-// 학번 입력 시 진행률 다시 로드
-document.getElementById('user_id').addEventListener('change', () => {
-    location.reload();
-});
-</script>
-</body>
-</html>
+<html lang="ko"><head><meta charset="utf-8"><title>검증 페이지 목록</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 40px auto;
+        padding: 20px; color: #1f2937; }
+h1 { color: #2563eb; }
+li { margin: 8px 0; font-size: 16px; }
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.note { background: #fef3c7; padding: 12px; border-radius: 6px; font-size: 14px;
+         color: #92400e; margin-top: 20px; }
+</style></head><body>
+<h1>📋 검증 페이지 목록</h1>
+<p>여러 분석 주제로 생성된 검증 도구들입니다. 클릭해서 들어가세요.</p>
+<ul><li><a href="embed.html">embed.html</a></li><li><a href="filter.html">filter.html</a></li><li><a href="keyword.html">keyword.html</a></li><li><a href="result.html">result.html</a></li><li><a href="verify_MEDICAL_AI.html">verify_MEDICAL_AI.html</a></li></ul>
+<div class="note">⚠️ 각 페이지의 AI 판정 결과는 1차 자료이며, 사람 검증이 필요합니다.</div>
+<p style="color:#9ca3af;font-size:13px;margin-top:30px;">
+Last updated: 2026-05-17 13:15
+</p>
+</body></html>
