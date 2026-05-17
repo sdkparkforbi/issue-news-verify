@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>임베딩 리뷰 — 검증 도구</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+<div id="header"></div>
+<div id="progress"></div>
+
+<div class="note">
+    <strong>🧠 임베딩 리뷰 사용법</strong><br>
+    아래 두 기사의 <b>키워드 벡터</b> 가 얼마나 비슷한지 5단계로 평가해 주세요.
+    아래 <b>2D 산점도</b>와 <b>공통/고유 어휘 비교</b>를 참고하시면 도움이 됩니다.<br>
+    • <b>키보드</b> <code>1</code>~<code>5</code> = 구간 선택 / <code>→</code> 다음 / <code>←</code> 이전<br>
+    • 평가하면 자동으로 DB 에 저장되고 다음 페어로 넘어갑니다.
+</div>
+
+<div id="content" class="loading">로딩 중...</div>
+
+<div class="action-bar">
+    <div class="info">
+        <b id="bar-info">로딩...</b>
+    </div>
+    <div>
+        <button class="btn" onclick="prev()">← 이전</button>
+        <button class="btn primary" onclick="next()">다음 →</button>
+        <a href="index.html" class="btn">세트 선택으로</a>
+        <a href="result.html" class="btn primary">결과 보기</a>
+    </div>
+</div>
+
+<footer>
+    차의과학대학교 AI헬스케어융합학과 · 박대근 교수
+</footer>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+const sess = requireSession();
+let PAIRS = [];
+let MY    = {};
+let META  = null;
+let idx   = 0;
+
+const BIN_LABELS = ['0.0-0.2', '0.2-0.4', '0.4-0.6', '0.6-0.8', '0.8-1.0'];
+const BIN_TITLES = ['매우 다름', '다름', '보통', '비슷', '매우 비슷'];
+
+(async () => {
+    try {
+        const data = await apiGet('get_pack', {
+            id:   sess.pack.eval_set_id,
+            pack: sess.pack.pack_no,
+            type: 'embedding',
+        });
+        PAIRS = data.samples;
+        META  = data.meta;
+        if (PAIRS.length === 0) {
+            document.getElementById('content').innerHTML =
+                `<div class="empty">임베딩 평가 페어가 없습니다.</div>`;
+            return;
+        }
+
+        // 내 응답
+        const reviewsResp = await fetch(`${API_BASE}?action=all_reviews&id=${encodeURIComponent(sess.pack.eval_set_id)}`);
+        const allReviews = await reviewsResp.json();
+        allReviews.filter(r => r.user_id === sess.user.user_id).forEach(r => {
+            MY[r.sample_id] = {human_label: r.human_label, note: r.note || ''};
+        });
+
+        document.getElementById('header').innerHTML = renderHeader(
+            "🧠 임베딩 리뷰",
+            `${META.topic_name} · 세트 ${META.pack_no} (${PAIRS.length}쌍)`
+        );
+
+        // 미평가 첫 페어로 시작
+        const firstUnreviewed = PAIRS.findIndex(s => !MY[s.sample_id]);
+        idx = firstUnreviewed >= 0 ? firstUnreviewed : 0;
+
+        renderCurrent();
+    } catch (e) {
+        document.getElementById('content').innerHTML =
+            `<div class="empty" style="color:#dc2626;">로드 실패: ${esc(e.message)}</div>`;
+    }
+})();
+
+function vocabSection(p) {
+    const common = p.vocab_comparison?.common || {};
+    const aOnly  = p.vocab_comparison?.a_only || {};
+    const bOnly  = p.vocab_comparison?.b_only || {};
+
+    const sortByFreq = (obj, isCommon = false) => {
+        return Object.entries(obj).sort((x, y) => {
+            const xf = isCommon ? (x[1][0] + x[1][1]) : x[1];
+            const yf = isCommon ? (y[1][0] + y[1][1]) : y[1];
+            return yf - xf;
+        });
+    };
+
+    const commonChips = sortByFreq(common, true).map(([w, [fa, fb]]) =>
+        `<span class="kw common">${esc(w)} <small>A:${fa} B:${fb}</small></span>`
+    ).join('');
+    const aChips = sortByFreq(aOnly).map(([w, f]) =>
+        `<span class="kw a-only">${esc(w)} <small>${f}</small></span>`
+    ).join('');
+    const bChips = sortByFreq(bOnly).map(([w, f]) =>
+        `<span class="kw b-only">${esc(w)} <small>${f}</small></span>`
+    ).join('');
+
+    return `
+    <div class="vocab-compare">
+        <h4>🔍 공통/고유 어휘 비교</h4>
+        <div style="margin-bottom:10px;">
+            <div style="font-size:12px;color:#92400e;font-weight:600;margin-bottom:4px;">
+                공통 어휘 (${Object.keys(common).length}개)
+            </div>
+            <div class="kws">${commonChips || '<span style="color:#9ca3af;font-size:13px;">없음</span>'}</div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <div style="font-size:12px;color:#1e40af;font-weight:600;margin-bottom:4px;">
+                A 에만 있는 어휘 (${Object.keys(aOnly).length}개)
+            </div>
+            <div class="kws">${aChips || '<span style="color:#9ca3af;font-size:13px;">없음</span>'}</div>
+        </div>
+        <div>
+            <div style="font-size:12px;color:#9d174d;font-weight:600;margin-bottom:4px;">
+                B 에만 있는 어휘 (${Object.keys(bOnly).length}개)
+            </div>
+            <div class="kws">${bChips || '<span style="color:#9ca3af;font-size:13px;">없음</span>'}</div>
+        </div>
+    </div>`;
+}
+
+function renderCurrent() {
+    const s = PAIRS[idx];
+    if (!s) return;
+    const p = s.payload || {};
+    const a = p.article_a || {};
+    const b = p.article_b || {};
+    const my = MY[s.sample_id] || {};
+    const myLabel = my.human_label || '';
+
+    const aKw = Object.entries(a.keywords || {}).sort((x,y) => y[1]-x[1])
+        .map(([w,f]) => `<span class="kw">${esc(w)} <small>${f}</small></span>`).join('');
+    const bKw = Object.entries(b.keywords || {}).sort((x,y) => y[1]-x[1])
+        .map(([w,f]) => `<span class="kw">${esc(w)} <small>${f}</small></span>`).join('');
+
+    document.getElementById('content').innerHTML = `
+        <div style="text-align:center; font-size:14px; color:#6b7280; margin-bottom:14px;">
+            페어 <b>${idx + 1} / ${PAIRS.length}</b>
+            ${myLabel ? `&nbsp;·&nbsp;내 평가: <b>${esc(myLabel)}</b>` : ''}
+        </div>
+
+        <div class="pair">
+            <div class="article">
+                <h3>📰 기사 A</h3>
+                <div class="meta-info">
+                    ${esc(a.press || '')} · ${fmtDate(a.date)}
+                    &nbsp;·&nbsp; <a href="${esc(s.url_a)}" target="_blank">원문 보기</a>
+                </div>
+                <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:#1f2937;">
+                    ${esc(a.title || '')}
+                </div>
+                <div class="preview">${esc(a.preview || '')}</div>
+                <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">키워드 (빈도순):</div>
+                <div class="kws">${aKw}</div>
+            </div>
+            <div class="article">
+                <h3>📰 기사 B</h3>
+                <div class="meta-info">
+                    ${esc(b.press || '')} · ${fmtDate(b.date)}
+                    &nbsp;·&nbsp; <a href="${esc(s.url_b)}" target="_blank">원문 보기</a>
+                </div>
+                <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:#1f2937;">
+                    ${esc(b.title || '')}
+                </div>
+                <div class="preview">${esc(b.preview || '')}</div>
+                <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">키워드 (빈도순):</div>
+                <div class="kws">${bKw}</div>
+            </div>
+        </div>
+
+        <div id="plot"></div>
+
+        ${vocabSection(p)}
+
+        <div class="card">
+            <div style="font-size:14px;color:#1f2937;font-weight:600;margin-bottom:10px;">
+                두 기사의 키워드 벡터는 얼마나 유사할까요?
+            </div>
+            <div class="scale">
+                ${BIN_LABELS.map((bin, i) => `
+                    <div class="opt ${myLabel === bin ? 'active' : ''}"
+                         onclick="setLabel(${s.sample_id}, '${bin}')">
+                        <span class="key">${i+1}</span>
+                        <span class="label">${BIN_TITLES[i]}</span>
+                        <span class="range">${bin}</span>
+                    </div>
+                `).join('')}
+            </div>
+            ${myLabel ? renderAiReveal('embedding', s, myLabel) : ''}
+        </div>
+    `;
+
+    // Plotly 산점도
+    drawPlot(p, a, b);
+
+    // 진행률
+    const done = PAIRS.filter(s2 => MY[s2.sample_id]).length;
+    document.getElementById('progress').innerHTML =
+        renderProgress(done, PAIRS.length, "임베딩 검증 진행");
+    document.getElementById('bar-info').textContent =
+        `임베딩: ${done} / ${PAIRS.length} 완료 (${idx+1}번째 페어 표시 중)`;
+}
+
+function drawPlot(p, a, b) {
+    const bg = p.background_points || [];
+
+    const traces = [];
+
+    // 배경 점
+    if (bg.length > 0) {
+        traces.push({
+            x: bg.map(d => d.umap[0]),
+            y: bg.map(d => d.umap[1]),
+            mode: 'markers',
+            type: 'scatter',
+            name: '다른 기사들',
+            text: bg.map(d => d.title || ''),
+            hovertemplate: '%{text}<extra></extra>',
+            marker: {size: 5, color: '#cbd5e1', opacity: 0.5},
+        });
+    }
+
+    // 기사 A
+    if (a.umap) {
+        traces.push({
+            x: [a.umap[0]], y: [a.umap[1]],
+            mode: 'markers+text',
+            type: 'scatter',
+            name: '기사 A',
+            text: ['A'],
+            textposition: 'top center',
+            textfont: {size: 14, color: '#1e40af', family: 'Arial Black'},
+            marker: {size: 18, color: '#3b82f6', line: {color: '#1e40af', width: 2}},
+            hovertemplate: '<b>기사 A</b><br>' + esc(a.title || '') + '<extra></extra>',
+        });
+    }
+
+    // 기사 B
+    if (b.umap) {
+        traces.push({
+            x: [b.umap[0]], y: [b.umap[1]],
+            mode: 'markers+text',
+            type: 'scatter',
+            name: '기사 B',
+            text: ['B'],
+            textposition: 'top center',
+            textfont: {size: 14, color: '#9d174d', family: 'Arial Black'},
+            marker: {size: 18, color: '#ec4899', line: {color: '#9d174d', width: 2}},
+            hovertemplate: '<b>기사 B</b><br>' + esc(b.title || '') + '<extra></extra>',
+        });
+    }
+
+    // A-B 연결선
+    if (a.umap && b.umap) {
+        traces.push({
+            x: [a.umap[0], b.umap[0]],
+            y: [a.umap[1], b.umap[1]],
+            mode: 'lines',
+            type: 'scatter',
+            name: '거리',
+            line: {color: '#94a3b8', width: 2, dash: 'dot'},
+            showlegend: false,
+            hoverinfo: 'skip',
+        });
+    }
+
+    const layout = {
+        title: {
+            text: '키워드 벡터 2D 투영 (UMAP)',
+            font: {size: 14},
+        },
+        height: 380,
+        margin: {t: 40, l: 40, r: 20, b: 40},
+        xaxis: {title: '', zeroline: false, showgrid: true, gridcolor: '#f3f4f6'},
+        yaxis: {title: '', zeroline: false, showgrid: true, gridcolor: '#f3f4f6'},
+        legend: {orientation: 'h', y: -0.15},
+        hovermode: 'closest',
+    };
+
+    Plotly.newPlot('plot', traces, layout, {responsive: true, displayModeBar: false});
+}
+
+async function setLabel(sampleId, label) {
+    MY[sampleId] = {human_label: label, note: MY[sampleId]?.note || ''};
+    try {
+        await apiPost('save_review', {
+            eval_set_id: sess.pack.eval_set_id,
+            pack_no:     sess.pack.pack_no,
+            review_type: 'embedding',
+            user_id:     sess.user.user_id,
+            display_name: sess.user.display_name,
+            sample_id:   sampleId,
+            human_label: label,
+            note:        MY[sampleId].note,
+        });
+        toast("저장됨");
+    } catch (e) {
+        toast("저장 실패: " + e.message, "error");
+        return;
+    }
+    // 즉시 다시 렌더 (AI 답 박스 표시)
+    renderCurrent();
+    // 1.5초 후 다음 미평가 페어로 자동 이동 (사용자가 답 확인할 시간 줌)
+    clearTimeout(window._nextTimer);
+    window._nextTimer = setTimeout(() => {
+        const nextUn = PAIRS.findIndex((s, i) => i > idx && !MY[s.sample_id]);
+        if (nextUn >= 0) {
+            idx = nextUn;
+            renderCurrent();
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+    }, 1800);
+}
+
+function next() {
+    if (idx < PAIRS.length - 1) { idx++; renderCurrent(); window.scrollTo({top:0}); }
+}
+function prev() {
+    if (idx > 0) { idx--; renderCurrent(); window.scrollTo({top:0}); }
+}
+
+// 키보드 단축키
+document.addEventListener('keydown', (e) => {
+    if (['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+    const s = PAIRS[idx];
+    if (!s) return;
+    if (e.key >= '1' && e.key <= '5') {
+        const bin = BIN_LABELS[parseInt(e.key) - 1];
+        setLabel(s.sample_id, bin);
+    } else if (e.key === 'ArrowRight') next();
+    else if (e.key === 'ArrowLeft')  prev();
+});
+</script>
+</body>
+</html>
